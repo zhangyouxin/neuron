@@ -1,4 +1,4 @@
-import { scriptToHash } from '@nervosnetwork/ckb-sdk-utils'
+import { utils } from '@ckb-lumos/lumos'
 import HexUtils from '../../utils/hex'
 import TypeChecker from '../../utils/type-checker'
 
@@ -18,6 +18,10 @@ export default class Script {
     this.codeHash = codeHash
     this.hashType = hashType
 
+    // TODO: args should be hex string, but when we create a script from SDK, it's not hex string
+    if (!this.args.startsWith('0x')) {
+      this.args = `0x${args}`
+    }
     TypeChecker.hashChecker(this.codeHash)
   }
 
@@ -34,7 +38,7 @@ export default class Script {
   }
 
   public computeHash(): string {
-    const hash: string = scriptToHash(this.toSDK())
+    const hash: string = utils.computeScriptHash(this.toSDK())
     return HexUtils.addPrefix(hash)
   }
 

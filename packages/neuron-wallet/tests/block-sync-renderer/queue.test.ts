@@ -1,6 +1,6 @@
 import { Subject } from 'rxjs'
 import { Tip } from '@ckb-lumos/base'
-import { scriptToAddress } from '@nervosnetwork/ckb-sdk-utils'
+import { config, helpers } from '@ckb-lumos/lumos'
 import { AddressType } from '../../src/models/keys/address'
 import SystemScriptInfo from '../../src/models/system-script-info'
 import { Address, AddressVersion } from '../../src/models/address'
@@ -97,11 +97,12 @@ describe('queue', () => {
   const shortAddressInfo = {
     lock: SystemScriptInfo.generateSecpScript('0x36c329ed630d6ce750712a477543672adab57f4c'),
   }
-  const address = scriptToAddress(shortAddressInfo.lock, false)
+  const address = helpers.encodeToAddress(shortAddressInfo.lock, { config: config.predefined.AGGRON4 })
   const fakeWalletId = 'w1'
   const addressInfo: Address = {
     address,
-    blake160: '0xfakeblake160',
+    // DELETE ME: blake160: '0xfakeblake160', // not valid hex nor valid blake160
+    blake160: '0x1234567890123456789012345678901234567890',
     walletId: fakeWalletId,
     path: '',
     addressType: AddressType.Receiving,
@@ -250,7 +251,11 @@ describe('queue', () => {
                 tx.blockHash = fakeTxWithStatus2.txStatus.blockHash!
                 tx.blockNumber = BigInt(fakeTxWithStatus2.transaction.blockNumber!).toString()
                 tx.timestamp = BigInt(fakeTxWithStatus2.transaction.timestamp!).toString()
-                expect(stubbedSaveFetchFn).toHaveBeenCalledWith(tx)
+                expect(stubbedSaveFetchFn).toHaveBeenCalledWith(tx, new Set([
+                  addressInfo.blake160,
+                  Multisig.hash([addressInfo.blake160]),
+                  SystemScriptInfo.generateSecpScript(addressInfo.blake160).computeHash().slice(0, 42),
+                ]))
               }
             })
             it('checks and generate new addresses', () => {

@@ -1,5 +1,5 @@
 import { getConnection } from 'typeorm'
-import { scriptToAddress } from '@nervosnetwork/ckb-sdk-utils'
+import { config, helpers } from '@ckb-lumos/lumos'
 import { initConnection } from '../../src/database/chain/ormconfig'
 import OutputEntity from '../../src/database/chain/entities/output'
 import { OutputStatus } from '../../src/models/chain/output'
@@ -53,7 +53,7 @@ describe('CellsService', () => {
   const alice = {
     lockScript: aliceLockScript,
     lockHash: aliceLockScript.computeHash(),
-    address: scriptToAddress(aliceLockScript, false),
+    address: helpers.encodeToAddress(aliceLockScript, { config: config.predefined.AGGRON4 }),
     blake160: alicePublicKeyHash,
     walletId: walletId1,
   }
@@ -63,7 +63,7 @@ describe('CellsService', () => {
   const bob = {
     lockScript: bobLockScript,
     lockHash: bobLockScript.computeHash(),
-    address: scriptToAddress(bobLockScript, false),
+    address: helpers.encodeToAddress(bobLockScript, { config: config.predefined.AGGRON4 }),
     blake160: bobPublicKeyHash,
     walletId: walletId1,
   }
@@ -73,7 +73,7 @@ describe('CellsService', () => {
   const multisigInfo = {
     lockScript: multisigLockScript,
     lockHash: multisigLockScript.computeHash(),
-    address: scriptToAddress(multisigLockScript, false),
+    address: helpers.encodeToAddress(multisigLockScript, { config: config.predefined.AGGRON4 }),
     blake160: multisigPublicKeyHash,
     walletId: walletId1,
   }
@@ -83,7 +83,7 @@ describe('CellsService', () => {
   const charlie = {
     lockScript: charlieLockScript,
     lockHash: charlieLockScript.computeHash(),
-    address: scriptToAddress(charlieLockScript, false),
+    address: helpers.encodeToAddress(charlieLockScript, { config: config.predefined.AGGRON4 }),
     blake160: charliePublicKeyHash,
     walletId: walletId2,
   }
@@ -1090,9 +1090,9 @@ describe('CellsService', () => {
   })
 
   describe('#usedByAnyoneCanPayBlake160s', () => {
-    const fakeArgs1 = '0x1'
-    const fakeArgs2 = '0x2'
-    const fakeArgs3 = '0x3'
+    const fakeArgs1 = '0x01'
+    const fakeArgs2 = '0x02'
+    const fakeArgs3 = '0x03'
     const codeHash = randomHex()
     const lockScript1 = new Script(codeHash, fakeArgs1, ScriptHashType.Type)
     const lockScript2 = new Script(codeHash, fakeArgs2, ScriptHashType.Type)

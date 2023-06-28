@@ -2,7 +2,6 @@ import fs from 'fs'
 import path from 'path'
 import { dialog, BrowserWindow } from 'electron'
 import { t } from 'i18next'
-import { addressToScript, scriptToAddress, scriptToHash } from '@nervosnetwork/ckb-sdk-utils'
 import { ResponseCode } from '../utils/const'
 import MultisigConfig from '../database/chain/entities/multisig-config'
 import MultisigConfigModel from '../models/multisig-config'
@@ -12,6 +11,7 @@ import OfflineSignService from '../services/offline-sign'
 import Multisig from '../models/multisig'
 import SystemScriptInfo from '../models/system-script-info'
 import NetworksService from '../services/networks'
+import { config as lumosConig, helpers, utils, config } from '@ckb-lumos/lumos'
 
 interface MultisigConfigOutput {
   multisig_configs: Record<
@@ -122,7 +122,13 @@ export default class MultisigController {
         r: +config.require_first_n,
         m: +config.threshold,
         n: config.sighash_addresses.length,
-        blake160s: config.sighash_addresses.map(v => addressToScript(v).args),
+        blake160s: config.sighash_addresses.map(v => {
+          const isMainnet = v.startsWith('ckb')
+          const lumosOptions = isMainnet
+            ? { config: lumosConig.predefined.LINA }
+            : { config: lumosConig.predefined.AGGRON4 }
+          return helpers.addressToScript(v, lumosOptions).args
+        }),
         walletId,
         alias: config.alias,
       }))
@@ -170,11 +176,13 @@ export default class MultisigController {
       return
     }
     const isMainnet = NetworksService.getInstance().isMainnet()
+    const lumosOptions = isMainnet ? { config: lumosConig.predefined.LINA } : { config: lumosConig.predefined.AGGRON4 }
+
     const output: MultisigConfigOutput = { multisig_configs: {} }
     configs.forEach(v => {
       output.multisig_configs[Multisig.hash(v.blake160s, v.r, v.m, v.n)] = {
         sighash_addresses: v.blake160s.map(args =>
-          scriptToAddress(SystemScriptInfo.generateSecpScript(args), isMainnet)
+          helpers.encodeToAddress(SystemScriptInfo.generateSecpScript(args), lumosOptions)
         ),
         require_first_n: v.r,
         threshold: v.m,
@@ -214,7 +222,9 @@ export default class MultisigController {
       }
     }
     const tx = result.json
-    const lockHash = scriptToHash(addressToScript(fullPayload))
+    const isMainnet = fullPayload.startsWith('ckb')
+    const lumosOptions = isMainnet ? { config: config.predefined.LINA } : { config: config.predefined.AGGRON4 }
+    const lockHash = utils.computeScriptHash(helpers.addressToScript(fullPayload, lumosOptions))
     if (tx.transaction.inputs.every(v => v.lockHash !== lockHash)) {
       dialog.showErrorBox(t('common.error'), t('messages.multisig-lock-hash-mismatch'))
       return {

@@ -1,5 +1,6 @@
 import { when } from 'jest-when'
 import { getConnection } from 'typeorm'
+import { config, helpers } from '@ckb-lumos/lumos'
 import { initConnection } from '../../../src/database/chain/ormconfig'
 import OutputEntity from '../../../src/database/chain/entities/output'
 import InputEntity from '../../../src/database/chain/entities/input'
@@ -17,7 +18,6 @@ import SystemScriptInfo from '../../../src/models/system-script-info'
 import AssetAccountInfo from '../../../src/models/asset-account-info'
 import BufferUtils from '../../../src/utils/buffer'
 import WitnessArgs from '../../../src/models/chain/witness-args'
-import { serializeWitnessArgs, scriptToAddress, addressToScript } from '@nervosnetwork/ckb-sdk-utils'
 import {
   CapacityNotEnough,
   CurrentWalletNotSet,
@@ -47,10 +47,11 @@ const fullAddressLockScript: Script = new Script(
   '0x1234',
   ScriptHashType.Type
 )
+
 const fullAddressInfo = {
   lockScript: fullAddressLockScript,
   lockHash: fullAddressLockScript.computeHash(),
-  address: scriptToAddress(fullAddressLockScript, false),
+  address: helpers.encodeToAddress(fullAddressLockScript, { config: config.predefined.AGGRON4 }),
 }
 
 // diff = 1000min
@@ -84,6 +85,9 @@ import HdPublicKeyInfo from '../../../src/database/chain/entities/hd-public-key-
 import AssetAccount from '../../../src/models/asset-account'
 import MultisigConfigModel from '../../../src/models/multisig-config'
 import MultisigOutput from '../../../src/database/chain/entities/multisig-output'
+import { bytes } from '@ckb-lumos/codec'
+import { blockchain } from '@ckb-lumos/base'
+import { LumosCell } from '../../../src/block-sync-renderer/sync/connector'
 
 describe('TransactionGenerator', () => {
   beforeAll(async () => {
@@ -754,7 +758,7 @@ describe('TransactionGenerator', () => {
             'ckt1qyqdpymnu202x3p4cnrrgek5czcdsg95xznswjr98y',
             'ckt1qyqdpymnu202x3p4cnrrgek5czcdsg95xznswjr98y',
             'ckt1qyqwqcknusdreymrhhme00hg9af3pr5hcmwqzfxvda',
-          ].map(v => addressToScript(v).args),
+          ].map(v => helpers.addressToScript(v, {config: config.predefined.AGGRON4}).args),
         })
       )
 
@@ -1088,19 +1092,19 @@ describe('TransactionGenerator', () => {
       tokenID: string | undefined = undefined,
       lockScript: Script = bobAnyoneCanPayLockScript,
       customData: string = '0x'
-    ) => {
-      const liveCell = {
-        block_hash: randomHex(),
-        out_point: {
-          tx_hash: randomHex(),
+    ): LumosCell => {
+      const liveCell: LumosCell = {
+        blockHash: randomHex(),
+        outPoint: {
+          txHash: randomHex(),
           index: '0x0',
         },
-        cell_output: {
+        cellOutput: {
           capacity: capacity,
           lock: {
-            code_hash: lockScript.codeHash,
+            codeHash: lockScript.codeHash,
             args: lockScript.args,
-            hash_type: lockScript.hashType.toString(),
+            hashType: lockScript.hashType.toString(),
           },
         },
         data: '0x',
@@ -1108,10 +1112,10 @@ describe('TransactionGenerator', () => {
       if (tokenID) {
         const typeScript = assetAccountInfo.generateSudtScript(tokenID)
         // @ts-ignore
-        liveCell.cell_output.type = {
-          code_hash: typeScript.codeHash,
+        liveCell.cellOutput.type = {
+          codeHash: typeScript.codeHash,
           args: typeScript.args,
-          hash_type: typeScript.hashType.toString(),
+          hashType: typeScript.hashType.toString(),
         }
       }
       liveCell.data = amount ? BufferUtils.writeBigUInt128LE(BigInt(amount)) : '0x'
@@ -1157,7 +1161,8 @@ describe('TransactionGenerator', () => {
             feeRate,
             '0'
           )
-          tx.witnesses[0] = serializeWitnessArgs(WitnessArgs.emptyLock().toSDK())
+          // tx.witnesses[0] = bytes.hexify(blockchain.WitnessArgs.pack(WitnessArgs.emptyLock().toSDK())
+          tx.witnesses[0] = bytes.hexify(blockchain.WitnessArgs.pack(WitnessArgs.emptyLock().toSDK()))
 
           expectedTxSize = TransactionSize.tx(tx)
           expectedTxFee = TransactionFee.fee(expectedTxSize, BigInt(feeRate)).toString()
@@ -1194,7 +1199,8 @@ describe('TransactionGenerator', () => {
           const targetOutput: Output = Output.fromObject({
             capacity: toShannon('61'),
             lock: aliceAnyoneCanPayLockScript,
-            type: assetAccountInfo.generateSudtScript('0xuuid'),
+            // DELETE ME: 0xuuid is not a valid args for sudt
+            type: assetAccountInfo.generateSudtScript('0x1234567890123456789012345678901234567890'),
             data: '0x',
           })
 
@@ -1207,7 +1213,7 @@ describe('TransactionGenerator', () => {
             feeRate,
             '0'
           )
-          tx.witnesses[0] = serializeWitnessArgs(WitnessArgs.emptyLock().toSDK())
+          tx.witnesses[0] = bytes.hexify(blockchain.WitnessArgs.pack(WitnessArgs.emptyLock().toSDK()))
 
           expectedTxSize = TransactionSize.tx(tx)
           expectedTxFee = TransactionFee.fee(expectedTxSize, BigInt(feeRate)).toString()
@@ -1264,7 +1270,7 @@ describe('TransactionGenerator', () => {
             feeRate,
             '0'
           )
-          tx.witnesses[0] = serializeWitnessArgs(WitnessArgs.emptyLock().toSDK())
+          tx.witnesses[0] = bytes.hexify(blockchain.WitnessArgs.pack(WitnessArgs.emptyLock().toSDK()))
 
           expectedTxSize = TransactionSize.tx(tx)
           expectedTxFee = TransactionFee.fee(expectedTxSize, BigInt(feeRate)).toString()
@@ -1349,7 +1355,7 @@ describe('TransactionGenerator', () => {
             '0'
           )
 
-          tx.witnesses[0] = serializeWitnessArgs(WitnessArgs.emptyLock().toSDK())
+          tx.witnesses[0] = bytes.hexify(blockchain.WitnessArgs.pack(WitnessArgs.emptyLock().toSDK()))
           tx.witnesses[1] = '0x'
 
           expectedTxSize = TransactionSize.tx(tx)
@@ -1400,8 +1406,8 @@ describe('TransactionGenerator', () => {
             '0'
           )
 
-          tx.witnesses[0] = serializeWitnessArgs(WitnessArgs.emptyLock().toSDK())
-          tx.witnesses[1] = serializeWitnessArgs(WitnessArgs.emptyLock().toSDK())
+          tx.witnesses[0] = bytes.hexify(blockchain.WitnessArgs.pack(WitnessArgs.emptyLock().toSDK()))
+          tx.witnesses[1] = bytes.hexify(blockchain.WitnessArgs.pack(WitnessArgs.emptyLock().toSDK()))
 
           expectedTxSize = TransactionSize.tx(tx)
           expectedTxFee = TransactionFee.fee(expectedTxSize, BigInt(feeRate)).toString()
@@ -1453,8 +1459,8 @@ describe('TransactionGenerator', () => {
             '0'
           )
 
-          tx.witnesses[0] = serializeWitnessArgs(WitnessArgs.emptyLock().toSDK())
-          tx.witnesses[1] = serializeWitnessArgs(WitnessArgs.emptyLock().toSDK())
+          tx.witnesses[0] = bytes.hexify(blockchain.WitnessArgs.pack(WitnessArgs.emptyLock().toSDK()))
+          tx.witnesses[1] = bytes.hexify(blockchain.WitnessArgs.pack(WitnessArgs.emptyLock().toSDK()))
         })
         it('should not use insufficient ACP cell as input', async () => {
           expect(tx.inputs.length).toEqual(3)
@@ -1615,7 +1621,7 @@ describe('TransactionGenerator', () => {
             feeRate,
             '0'
           )
-          tx.witnesses[0] = serializeWitnessArgs(WitnessArgs.emptyLock().toSDK())
+          tx.witnesses[0] = bytes.hexify(blockchain.WitnessArgs.pack(WitnessArgs.emptyLock().toSDK()))
 
           expectedTxSize = TransactionSize.tx(tx)
           expectedTxFee = TransactionFee.fee(expectedTxSize, BigInt(feeRate)).toString()
@@ -1689,7 +1695,7 @@ describe('TransactionGenerator', () => {
             feeRate,
             '0'
           )
-          tx.witnesses[0] = serializeWitnessArgs(WitnessArgs.emptyLock().toSDK())
+          tx.witnesses[0] = bytes.hexify(blockchain.WitnessArgs.pack(WitnessArgs.emptyLock().toSDK()))
 
           expectedTxSize = TransactionSize.tx(tx)
           expectedTxFee = TransactionFee.fee(expectedTxSize, BigInt(feeRate)).toString()
@@ -1772,8 +1778,8 @@ describe('TransactionGenerator', () => {
             '0'
           )
 
-          tx.witnesses[0] = serializeWitnessArgs(WitnessArgs.emptyLock().toSDK())
-          tx.witnesses[1] = serializeWitnessArgs(WitnessArgs.emptyLock().toSDK())
+          tx.witnesses[0] = bytes.hexify(blockchain.WitnessArgs.pack(WitnessArgs.emptyLock().toSDK()))
+          tx.witnesses[1] = bytes.hexify(blockchain.WitnessArgs.pack(WitnessArgs.emptyLock().toSDK()))
 
           expectedTxSize = TransactionSize.tx(tx)
           expectedTxFee = TransactionFee.fee(expectedTxSize, BigInt(feeRate)).toString()
@@ -1850,7 +1856,7 @@ describe('TransactionGenerator', () => {
             '0'
           )
 
-          tx.witnesses[0] = serializeWitnessArgs(WitnessArgs.emptyLock().toSDK())
+          tx.witnesses[0] = bytes.hexify(blockchain.WitnessArgs.pack(WitnessArgs.emptyLock().toSDK()))
           tx.witnesses[1] = '0x'
 
           expectedTxSize = TransactionSize.tx(tx)
@@ -1965,7 +1971,7 @@ describe('TransactionGenerator', () => {
             '0'
           )
 
-          tx.witnesses[0] = serializeWitnessArgs(WitnessArgs.emptyLock().toSDK())
+          tx.witnesses[0] = bytes.hexify(blockchain.WitnessArgs.pack(WitnessArgs.emptyLock().toSDK()))
 
           expectedTxSize = TransactionSize.tx(tx)
           expectedTxFee = TransactionFee.fee(expectedTxSize, BigInt(feeRate)).toString()
@@ -2036,8 +2042,8 @@ describe('TransactionGenerator', () => {
             feeRate,
             '0'
           )
-          tx.witnesses[0] = serializeWitnessArgs(WitnessArgs.emptyLock().toSDK())
-          tx.witnesses[1] = serializeWitnessArgs(WitnessArgs.emptyLock().toSDK())
+          tx.witnesses[0] = bytes.hexify(blockchain.WitnessArgs.pack(WitnessArgs.emptyLock().toSDK()))
+          tx.witnesses[1] = bytes.hexify(blockchain.WitnessArgs.pack(WitnessArgs.emptyLock().toSDK()))
 
           expectedTxSize = TransactionSize.tx(tx)
           expectedTxFee = TransactionFee.fee(expectedTxSize, BigInt(feeRate)).toString()
@@ -2510,7 +2516,7 @@ describe('TransactionGenerator', () => {
           const sudtCell = Output.fromObject(sudtCellObject)
           when(stubbedQueryIndexer)
             .calledWith({
-              lock: addressToScript('ckt1qyq0tejcz8rl6yyjw3m3vnu7r955d9ecj9gq46suu6'),
+              lock: helpers.addressToScript('ckt1qyq0tejcz8rl6yyjw3m3vnu7r955d9ecj9gq46suu6', {config: config.predefined.AGGRON4}),
               type: sudtCell.type,
               data: null,
             })
@@ -2523,7 +2529,7 @@ describe('TransactionGenerator', () => {
           const sudtCell = Output.fromObject(sudtCellObject)
           sudtCell.setCapacity(toShannon('144'))
           getCurrentMock.mockReturnValueOnce({})
-          const bobLockHash = scriptToAddress(bobAnyoneCanPayLockScript)
+          const bobLockHash = helpers.encodeToAddress(bobAnyoneCanPayLockScript)
           const res = (await TransactionGenerator.generateSudtMigrateAcpTx(sudtCell, bobLockHash)) as Transaction
           expect(res.outputs).toHaveLength(2)
           expect(res.outputs[1].data).toEqual(BufferUtils.writeBigUInt128LE(BigInt(200)))
@@ -2534,7 +2540,7 @@ describe('TransactionGenerator', () => {
             id: alice.walletId,
             getNextChangeAddress: () => ({ address: alice.address }),
           })
-          const bobLockHash = scriptToAddress(bobAnyoneCanPayLockScript)
+          const bobLockHash = helpers.encodeToAddress(bobAnyoneCanPayLockScript)
           const res = (await TransactionGenerator.generateSudtMigrateAcpTx(sudtCell, bobLockHash)) as Transaction
           expect(res.outputs).toHaveLength(3)
           expect(res.outputs[1].data).toEqual(BufferUtils.writeBigUInt128LE(BigInt(200)))
